@@ -49,7 +49,7 @@ class ProductDetailServiceImplTest {
     @Test
     void create_shouldThrowResourceNotFoundException_whenProductDoesNotExist() {
         UUID productId = UUID.randomUUID();
-        ProductDetailRequest request = new ProductDetailRequest(UUID.randomUUID(), null, true);
+        ProductDetailRequest request = new ProductDetailRequest(UUID.randomUUID());
         given(productRepository.findById(productId)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> productDetailService.create(productId, request))
@@ -62,7 +62,7 @@ class ProductDetailServiceImplTest {
         UUID addonId = UUID.randomUUID();
         Product product = Product.builder().id(productId).name("Marquesita").build();
         ProductAddon addon = ProductAddon.builder().id(addonId).name("Jalapenos").price(BigDecimal.ONE).available(false).build();
-        ProductDetailRequest request = new ProductDetailRequest(addonId, null, true);
+        ProductDetailRequest request = new ProductDetailRequest(addonId);
 
         given(productRepository.findById(productId)).willReturn(Optional.of(product));
         given(productAddonRepository.findById(addonId)).willReturn(Optional.of(addon));
@@ -78,7 +78,7 @@ class ProductDetailServiceImplTest {
         UUID addonId = UUID.randomUUID();
         Product product = Product.builder().id(productId).name("Marquesita").build();
         ProductAddon addon = ProductAddon.builder().id(addonId).name("Queso").price(BigDecimal.ONE).available(true).build();
-        ProductDetailRequest request = new ProductDetailRequest(addonId, null, true);
+        ProductDetailRequest request = new ProductDetailRequest(addonId);
 
         given(productRepository.findById(productId)).willReturn(Optional.of(product));
         given(productAddonRepository.findById(addonId)).willReturn(Optional.of(addon));
@@ -94,11 +94,10 @@ class ProductDetailServiceImplTest {
         UUID addonId = UUID.randomUUID();
         Product product = Product.builder().id(productId).name("Marquesita").build();
         ProductAddon addon = ProductAddon.builder().id(addonId).name("Queso").price(BigDecimal.ONE).available(true).build();
-        ProductDetailRequest request = new ProductDetailRequest(addonId, null, true);
-        ProductDetail entity = ProductDetail.builder().available(true).build();
-        ProductDetail saved = ProductDetail.builder().id(UUID.randomUUID()).product(product).addon(addon).available(true).build();
-        ProductDetailResponse response = new ProductDetailResponse(
-                saved.getId(), productId, addonId, "Queso", BigDecimal.ONE, null, BigDecimal.ONE, true);
+        ProductDetailRequest request = new ProductDetailRequest(addonId);
+        ProductDetail entity = ProductDetail.builder().build();
+        ProductDetail saved = ProductDetail.builder().id(UUID.randomUUID()).product(product).addon(addon).build();
+        ProductDetailResponse response = new ProductDetailResponse(saved.getId(), productId, addonId, "Queso", BigDecimal.ONE);
 
         given(productRepository.findById(productId)).willReturn(Optional.of(product));
         given(productAddonRepository.findById(addonId)).willReturn(Optional.of(addon));

@@ -56,10 +56,6 @@ CREATE TABLE product_details (
 
     addon_id UUID NOT NULL,
 
-    price_override NUMERIC(10,2),
-
-    available BOOLEAN NOT NULL DEFAULT TRUE,
-
     CONSTRAINT fk_product_detail_product
         FOREIGN KEY(product_id)
         REFERENCES products(id),
@@ -114,8 +110,6 @@ CREATE TABLE order_details (
 
     unit_price NUMERIC(10,2) NOT NULL,
 
-    selected_addons JSONB,
-
     subtotal NUMERIC(10,2) NOT NULL,
 
     CONSTRAINT fk_order_detail_order
@@ -126,6 +120,32 @@ CREATE TABLE order_details (
     CONSTRAINT fk_order_detail_product
         FOREIGN KEY(product_id)
         REFERENCES products(id)
+);
+
+-- ============================================
+-- ORDER DETAIL ADDONS
+-- ============================================
+
+CREATE TABLE order_detail_addons (
+
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    order_detail_id UUID NOT NULL,
+
+    addon_id UUID NOT NULL,
+
+    addon_name VARCHAR(100) NOT NULL,
+
+    unit_price NUMERIC(10,2) NOT NULL CHECK (unit_price >= 0),
+
+    CONSTRAINT fk_order_detail_addons_order_detail
+        FOREIGN KEY (order_detail_id)
+        REFERENCES order_details(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_order_detail_addons_addon
+        FOREIGN KEY (addon_id)
+        REFERENCES products_addons(id)
 );
 
 CREATE INDEX idx_products_category
@@ -148,3 +168,10 @@ ON orders(status);
 
 CREATE INDEX idx_orders_created_at
 ON orders(created_at);
+
+CREATE INDEX idx_order_detail_addons_order_detail
+ON order_detail_addons(order_detail_id);
+
+CREATE INDEX idx_order_detail_addons_addon
+ON order_detail_addons(addon_id);
+

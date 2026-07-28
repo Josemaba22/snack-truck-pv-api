@@ -8,8 +8,5 @@ public record ProductDetailResponse(
         UUID productId,
         UUID addonId,
         String addonName,
-        BigDecimal addonPrice,
-        BigDecimal priceOverride,
-        BigDecimal effectivePrice,
-        Boolean available) {
+        BigDecimal addonPrice) {
 }

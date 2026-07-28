@@ -10,6 +10,6 @@ public record OrderDetailResponse(
         String productName,
         Integer quantity,
         BigDecimal unitPrice,
-        List<SelectedAddonResponse> selectedAddons,
+        List<OrderDetailAddonResponse> addons,
         BigDecimal subtotal) {
 }

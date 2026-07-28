@@ -6,14 +6,15 @@ import com.josemaba.marquesitasapi.dto.request.OrderStatusUpdateRequest;
 import com.josemaba.marquesitasapi.dto.response.OrderResponse;
 import com.josemaba.marquesitasapi.entity.Order;
 import com.josemaba.marquesitasapi.entity.OrderDetail;
+import com.josemaba.marquesitasapi.entity.OrderDetailAddon;
 import com.josemaba.marquesitasapi.entity.OrderStatus;
 import com.josemaba.marquesitasapi.entity.Product;
-import com.josemaba.marquesitasapi.entity.ProductDetail;
-import com.josemaba.marquesitasapi.entity.SelectedAddonSnapshot;
+import com.josemaba.marquesitasapi.entity.ProductAddon;
 import com.josemaba.marquesitasapi.exception.BusinessRuleViolationException;
 import com.josemaba.marquesitasapi.exception.ResourceNotFoundException;
 import com.josemaba.marquesitasapi.mapper.OrderMapper;
 import com.josemaba.marquesitasapi.repository.OrderRepository;
+import com.josemaba.marquesitasapi.repository.ProductAddonRepository;
 import com.josemaba.marquesitasapi.repository.ProductDetailRepository;
 import com.josemaba.marquesitasapi.repository.ProductRepository;
 import com.josemaba.marquesitasapi.service.OrderService;
@@ -42,6 +43,7 @@ public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
+    private final ProductAddonRepository productAddonRepository;
     private final ProductDetailRepository productDetailRepository;
     private final OrderMapper orderMapper;
 
@@ -109,34 +111,40 @@ public class OrderServiceImpl implements OrderService {
         }
 
         List<UUID> addonIds = item.selectedAddonIds() == null ? List.of() : item.selectedAddonIds();
-        List<SelectedAddonSnapshot> snapshots = new ArrayList<>();
+        List<OrderDetailAddon> orderDetailAddons = new ArrayList<>();
         BigDecimal addonsSum = BigDecimal.ZERO;
 
         for (UUID addonId : addonIds) {
-            ProductDetail productDetail = productDetailRepository.findByProductIdAndAddonId(product.getId(), addonId)
-                    .orElseThrow(() -> new BusinessRuleViolationException(
-                            "Addon %s is not assigned to product %s".formatted(addonId, product.getId())));
-            if (!Boolean.TRUE.equals(productDetail.getAvailable())) {
-                throw new BusinessRuleViolationException("Addon is not available for this product: " + addonId);
+            ProductAddon addon = productAddonRepository.findById(addonId)
+                    .orElseThrow(() -> ResourceNotFoundException.of("ProductAddon", addonId));
+            if (!Boolean.TRUE.equals(addon.getAvailable())) {
+                throw new BusinessRuleViolationException("Addon is not available: " + addonId);
             }
-            BigDecimal addonPrice = productDetail.getPriceOverride() != null
-                    ? productDetail.getPriceOverride()
-                    : productDetail.getAddon().getPrice();
-            addonsSum = addonsSum.add(addonPrice);
-            snapshots.add(new SelectedAddonSnapshot(addonId, productDetail.getAddon().getName(), addonPrice));
+            if (!productDetailRepository.existsByProductIdAndAddonId(product.getId(), addonId)) {
+                throw new BusinessRuleViolationException(
+                        "Addon %s is not assigned to product %s".formatted(addonId, product.getId()));
+            }
+            addonsSum = addonsSum.add(addon.getPrice());
+            orderDetailAddons.add(OrderDetailAddon.builder()
+                    .addon(addon)
+                    .addonName(addon.getName())
+                    .unitPrice(addon.getPrice())
+                    .build());
         }
 
         BigDecimal quantity = BigDecimal.valueOf(item.quantity());
         BigDecimal lineSubtotal = product.getPrice().add(addonsSum).multiply(quantity)
                 .setScale(2, RoundingMode.HALF_UP);
 
-        return OrderDetail.builder()
+        OrderDetail detail = OrderDetail.builder()
                 .product(product)
                 .quantity(item.quantity())
                 .unitPrice(product.getPrice())
-                .selectedAddons(snapshots)
+                .orderDetailAddons(orderDetailAddons)
                 .subtotal(lineSubtotal)
                 .build();
+        orderDetailAddons.forEach(orderDetailAddon -> orderDetailAddon.setOrderDetail(detail));
+        return detail;
     }
 
     private void applyStatusTransition(Order order, OrderStatus target) {

@@ -12,16 +12,16 @@ import com.josemaba.marquesitasapi.dto.request.OrderRequest;
 import com.josemaba.marquesitasapi.dto.request.OrderStatusUpdateRequest;
 import com.josemaba.marquesitasapi.entity.Order;
 import com.josemaba.marquesitasapi.entity.OrderDetail;
+import com.josemaba.marquesitasapi.entity.OrderDetailAddon;
 import com.josemaba.marquesitasapi.entity.OrderStatus;
 import com.josemaba.marquesitasapi.entity.PaymentMethod;
 import com.josemaba.marquesitasapi.entity.Product;
 import com.josemaba.marquesitasapi.entity.ProductAddon;
-import com.josemaba.marquesitasapi.entity.ProductDetail;
-import com.josemaba.marquesitasapi.entity.SelectedAddonSnapshot;
 import com.josemaba.marquesitasapi.exception.BusinessRuleViolationException;
 import com.josemaba.marquesitasapi.exception.ResourceNotFoundException;
 import com.josemaba.marquesitasapi.mapper.OrderMapper;
 import com.josemaba.marquesitasapi.repository.OrderRepository;
+import com.josemaba.marquesitasapi.repository.ProductAddonRepository;
 import com.josemaba.marquesitasapi.repository.ProductDetailRepository;
 import com.josemaba.marquesitasapi.repository.ProductRepository;
 import java.math.BigDecimal;
@@ -46,6 +46,9 @@ class OrderServiceImplTest {
     private ProductRepository productRepository;
 
     @Mock
+    private ProductAddonRepository productAddonRepository;
+
+    @Mock
     private ProductDetailRepository productDetailRepository;
 
     @Mock
@@ -58,26 +61,23 @@ class OrderServiceImplTest {
     private ArgumentCaptor<Order> orderCaptor;
 
     @Test
-    void create_shouldCalculateLineAndOrderTotals_withAddonsAndPriceOverride() {
+    void create_shouldCalculateLineAndOrderTotals_withAddons() {
         UUID productId = UUID.randomUUID();
         UUID addon1Id = UUID.randomUUID();
         UUID addon2Id = UUID.randomUUID();
 
         Product product = Product.builder().id(productId).name("Marquesita").price(new BigDecimal("45.00")).available(true).build();
-
         ProductAddon addon1 = ProductAddon.builder().id(addon1Id).name("Queso extra").price(new BigDecimal("10.00")).available(true).build();
-        ProductDetail detail1 = ProductDetail.builder().product(product).addon(addon1).available(true).build();
-
         ProductAddon addon2 = ProductAddon.builder().id(addon2Id).name("Tocino").price(new BigDecimal("8.00")).available(true).build();
-        ProductDetail detail2 = ProductDetail.builder().product(product).addon(addon2).available(true)
-                .priceOverride(new BigDecimal("5.00")).build();
 
         OrderItemRequest item = new OrderItemRequest(productId, 2, List.of(addon1Id, addon2Id));
         OrderRequest request = new OrderRequest(List.of(item), "sin cebolla", PaymentMethod.CASH);
 
         given(productRepository.findById(productId)).willReturn(Optional.of(product));
-        given(productDetailRepository.findByProductIdAndAddonId(productId, addon1Id)).willReturn(Optional.of(detail1));
-        given(productDetailRepository.findByProductIdAndAddonId(productId, addon2Id)).willReturn(Optional.of(detail2));
+        given(productAddonRepository.findById(addon1Id)).willReturn(Optional.of(addon1));
+        given(productAddonRepository.findById(addon2Id)).willReturn(Optional.of(addon2));
+        given(productDetailRepository.existsByProductIdAndAddonId(productId, addon1Id)).willReturn(true);
+        given(productDetailRepository.existsByProductIdAndAddonId(productId, addon2Id)).willReturn(true);
         given(orderRepository.save(any(Order.class))).willAnswer(invocation -> invocation.getArgument(0));
 
         orderService.create(request);
@@ -86,16 +86,17 @@ class OrderServiceImplTest {
         Order savedOrder = orderCaptor.getValue();
 
         assertThat(savedOrder.getStatus()).isEqualTo(OrderStatus.PENDING);
-        assertThat(savedOrder.getSubtotal()).isEqualByComparingTo("120.00");
-        assertThat(savedOrder.getTotal()).isEqualByComparingTo("120.00");
+        assertThat(savedOrder.getSubtotal()).isEqualByComparingTo("126.00");
+        assertThat(savedOrder.getTotal()).isEqualByComparingTo("126.00");
         assertThat(savedOrder.getOrderDetails()).hasSize(1);
 
         OrderDetail line = savedOrder.getOrderDetails().get(0);
         assertThat(line.getUnitPrice()).isEqualByComparingTo("45.00");
-        assertThat(line.getSubtotal()).isEqualByComparingTo("120.00");
+        assertThat(line.getSubtotal()).isEqualByComparingTo("126.00");
         assertThat(line.getOrder()).isEqualTo(savedOrder);
-        assertThat(line.getSelectedAddons()).extracting(SelectedAddonSnapshot::price)
-                .containsExactlyInAnyOrder(new BigDecimal("10.00"), new BigDecimal("5.00"));
+        assertThat(line.getOrderDetailAddons()).extracting(OrderDetailAddon::getUnitPrice)
+                .containsExactlyInAnyOrder(new BigDecimal("10.00"), new BigDecimal("8.00"));
+        assertThat(line.getOrderDetailAddons()).allSatisfy(addon -> assertThat(addon.getOrderDetail()).isEqualTo(line));
     }
 
     @Test
@@ -124,30 +125,45 @@ class OrderServiceImplTest {
     }
 
     @Test
-    void create_shouldThrowBusinessRuleViolationException_whenAddonNotAssignedToProduct() {
+    void create_shouldThrowResourceNotFoundException_whenAddonDoesNotExist() {
         UUID productId = UUID.randomUUID();
         UUID addonId = UUID.randomUUID();
         Product product = Product.builder().id(productId).name("Marquesita").price(BigDecimal.TEN).available(true).build();
         OrderItemRequest item = new OrderItemRequest(productId, 1, List.of(addonId));
         OrderRequest request = new OrderRequest(List.of(item), null, PaymentMethod.CASH);
         given(productRepository.findById(productId)).willReturn(Optional.of(product));
-        given(productDetailRepository.findByProductIdAndAddonId(productId, addonId)).willReturn(Optional.empty());
+        given(productAddonRepository.findById(addonId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> orderService.create(request))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void create_shouldThrowBusinessRuleViolationException_whenAddonNotAvailable() {
+        UUID productId = UUID.randomUUID();
+        UUID addonId = UUID.randomUUID();
+        Product product = Product.builder().id(productId).name("Marquesita").price(BigDecimal.TEN).available(true).build();
+        ProductAddon addon = ProductAddon.builder().id(addonId).name("Jalapenos").price(BigDecimal.ONE).available(false).build();
+        OrderItemRequest item = new OrderItemRequest(productId, 1, List.of(addonId));
+        OrderRequest request = new OrderRequest(List.of(item), null, PaymentMethod.CASH);
+        given(productRepository.findById(productId)).willReturn(Optional.of(product));
+        given(productAddonRepository.findById(addonId)).willReturn(Optional.of(addon));
 
         assertThatThrownBy(() -> orderService.create(request))
                 .isInstanceOf(BusinessRuleViolationException.class);
     }
 
     @Test
-    void create_shouldThrowBusinessRuleViolationException_whenAddonNotAvailableForProduct() {
+    void create_shouldThrowBusinessRuleViolationException_whenAddonNotAssignedToProduct() {
         UUID productId = UUID.randomUUID();
         UUID addonId = UUID.randomUUID();
         Product product = Product.builder().id(productId).name("Marquesita").price(BigDecimal.TEN).available(true).build();
         ProductAddon addon = ProductAddon.builder().id(addonId).name("Jalapenos").price(BigDecimal.ONE).available(true).build();
-        ProductDetail detail = ProductDetail.builder().product(product).addon(addon).available(false).build();
         OrderItemRequest item = new OrderItemRequest(productId, 1, List.of(addonId));
         OrderRequest request = new OrderRequest(List.of(item), null, PaymentMethod.CASH);
         given(productRepository.findById(productId)).willReturn(Optional.of(product));
-        given(productDetailRepository.findByProductIdAndAddonId(productId, addonId)).willReturn(Optional.of(detail));
+        given(productAddonRepository.findById(addonId)).willReturn(Optional.of(addon));
+        given(productDetailRepository.existsByProductIdAndAddonId(productId, addonId)).willReturn(false);
 
         assertThatThrownBy(() -> orderService.create(request))
                 .isInstanceOf(BusinessRuleViolationException.class);

@@ -1,5 +1,6 @@
 package com.josemaba.marquesitasapi.entity;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -8,8 +9,10 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -19,8 +22,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "order_details")
@@ -30,7 +31,7 @@ import org.hibernate.type.SqlTypes;
 @AllArgsConstructor
 @Builder
 @EqualsAndHashCode(of = "id")
-@ToString(exclude = {"order", "product"})
+@ToString(exclude = {"order", "product", "orderDetailAddons"})
 public class OrderDetail {
 
     @Id
@@ -51,10 +52,10 @@ public class OrderDetail {
     @Column(name = "unit_price", nullable = false, precision = 10, scale = 2)
     private BigDecimal unitPrice;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "selected_addons", columnDefinition = "jsonb")
-    private List<SelectedAddonSnapshot> selectedAddons;
-
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal subtotal;
+
+    @OneToMany(mappedBy = "orderDetail", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<OrderDetailAddon> orderDetailAddons = new ArrayList<>();
 }
