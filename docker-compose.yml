@@ -1,0 +1,17 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: snack-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: marquesitas
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/marquesitas-bd.sql:/docker-entrypoint-initdb.d/marquesitas-bd.sql:ro
+
+volumes:
+  postgres_data:

@@ -3,9 +3,9 @@ spring:
     name: marquesitasapi
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/marquesitas}
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/marquesitas}
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:AdminRoot.123}
+    password: ${DB_PASSWORD:123}
     driver-class-name: org.postgresql.Driver
 
   jpa:
