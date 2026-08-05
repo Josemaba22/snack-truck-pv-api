@@ -24,6 +24,8 @@ mvnw.cmd spring-boot:run         # run the app locally (port 8081 by default)
 
 The app requires a running PostgreSQL instance matching `marquesitas-bd.sql`. Connection is configured via env vars with local defaults (see `src/main/resources/application.yaml`): `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `SERVER_PORT`. `spring.jpa.hibernate.ddl-auto` is `validate` — schema changes must be made in `marquesitas-bd.sql` and applied to the database directly; Hibernate will not auto-migrate.
 
+Postgres normally runs via `docker-compose.yml` (`docker compose up -d`), mapped to host port 5433 to avoid clashing with a locally-installed Postgres. To use a locally-installed Postgres (standard port 5432, same db/user/password) instead of Docker, activate the `dev-postgres` profile — `src/main/resources/application-dev-postgres.yaml` overrides `spring.datasource.url` accordingly: `mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=dev-postgres`, or set `SPRING_PROFILES_ACTIVE=dev-postgres`. That local instance also needs `marquesitas-bd.sql` applied manually beforehand — same caveat as the Docker instance.
+
 Swagger UI is served at `/swagger-ui.html`, OpenAPI JSON at `/v3/api-docs`.
 
 ## Architecture
