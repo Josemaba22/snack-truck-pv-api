@@ -1,0 +1,25 @@
+# Dev-only image: warms the Maven dependency cache at build time; source
+# comes from a bind mount at runtime (see ../docker-compose.dev.yml).
+# spring-boot-devtools (already on the classpath) auto-restarts the app
+# when your IDE recompiles changed classes into target/classes.
+FROM eclipse-temurin:21-jdk
+
+# Run as the image's built-in "ubuntu" user (UID/GID 1000, which matches
+# most Linux dev machines including this one) so files this container
+# writes into the bind-mounted project (target/, generated-sources) stay
+# owned by you on the host instead of root.
+WORKDIR /app
+RUN chown ubuntu:ubuntu /app
+USER ubuntu
+ENV HOME=/home/ubuntu
+
+COPY --chown=ubuntu:ubuntu mvnw .
+COPY --chown=ubuntu:ubuntu .mvn .mvn
+COPY --chown=ubuntu:ubuntu pom.xml .
+RUN chmod +x mvnw && ./mvnw -B dependency:go-offline
+
+EXPOSE 8081
+
+# chmod again at start: the bind mount overlays /app with host files,
+# and mvnw isn't executable in this repo on the host.
+CMD ["sh", "-c", "chmod +x mvnw && ./mvnw spring-boot:run"]
