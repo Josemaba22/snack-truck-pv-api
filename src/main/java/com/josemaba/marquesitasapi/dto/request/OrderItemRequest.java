@@ -14,5 +14,7 @@ public record OrderItemRequest(
         @Min(value = 1, message = "quantity must be at least 1")
         Integer quantity,
 
-        List<UUID> selectedAddonIds) {
+        List<UUID> extraIngredientIds,
+
+        List<UUID> removedIngredientIds) {
 }

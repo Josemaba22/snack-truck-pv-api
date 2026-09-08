@@ -31,7 +31,7 @@ import lombok.ToString;
 @AllArgsConstructor
 @Builder
 @EqualsAndHashCode(of = "id")
-@ToString(exclude = {"order", "product", "orderDetailAddons"})
+@ToString(exclude = {"order", "product", "orderDetailIngredients"})
 public class OrderDetail {
 
     @Id
@@ -57,5 +57,5 @@ public class OrderDetail {
 
     @OneToMany(mappedBy = "orderDetail", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
-    private List<OrderDetailAddon> orderDetailAddons = new ArrayList<>();
+    private List<OrderDetailIngredient> orderDetailIngredients = new ArrayList<>();
 }

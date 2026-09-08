@@ -1,8 +1,8 @@
 package com.josemaba.marquesitasapi.controller;
 
-import com.josemaba.marquesitasapi.dto.request.ProductAddonRequest;
-import com.josemaba.marquesitasapi.dto.response.ProductAddonResponse;
-import com.josemaba.marquesitasapi.service.ProductAddonService;
+import com.josemaba.marquesitasapi.dto.request.IngredientRequest;
+import com.josemaba.marquesitasapi.dto.response.IngredientResponse;
+import com.josemaba.marquesitasapi.service.IngredientService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -22,17 +22,17 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @RestController
-@RequestMapping("/api/addons")
+@RequestMapping("/api/ingredients")
 @RequiredArgsConstructor
-@Tag(name = "Addons", description = "Product addon management")
-public class ProductAddonController {
+@Tag(name = "Ingredients", description = "Ingredient catalog management")
+public class IngredientController {
 
-    private final ProductAddonService productAddonService;
+    private final IngredientService ingredientService;
 
     @PostMapping
-    @Operation(summary = "Create an addon")
-    public ResponseEntity<ProductAddonResponse> create(@Valid @RequestBody ProductAddonRequest request) {
-        ProductAddonResponse response = productAddonService.create(request);
+    @Operation(summary = "Create an ingredient")
+    public ResponseEntity<IngredientResponse> create(@Valid @RequestBody IngredientRequest request) {
+        IngredientResponse response = ingredientService.create(request);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
                 .path("/{id}")
                 .buildAndExpand(response.id())
@@ -41,27 +41,27 @@ public class ProductAddonController {
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Update an addon")
-    public ResponseEntity<ProductAddonResponse> update(@PathVariable UUID id, @Valid @RequestBody ProductAddonRequest request) {
-        return ResponseEntity.ok(productAddonService.update(id, request));
+    @Operation(summary = "Update an ingredient")
+    public ResponseEntity<IngredientResponse> update(@PathVariable UUID id, @Valid @RequestBody IngredientRequest request) {
+        return ResponseEntity.ok(ingredientService.update(id, request));
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Delete an addon")
+    @Operation(summary = "Delete an ingredient")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
-        productAddonService.delete(id);
+        ingredientService.delete(id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get an addon by id")
-    public ResponseEntity<ProductAddonResponse> getById(@PathVariable UUID id) {
-        return ResponseEntity.ok(productAddonService.getById(id));
+    @Operation(summary = "Get an ingredient by id")
+    public ResponseEntity<IngredientResponse> getById(@PathVariable UUID id) {
+        return ResponseEntity.ok(ingredientService.getById(id));
     }
 
     @GetMapping
-    @Operation(summary = "Get all addons")
-    public ResponseEntity<List<ProductAddonResponse>> getAll() {
-        return ResponseEntity.ok(productAddonService.getAll());
+    @Operation(summary = "Get all ingredients")
+    public ResponseEntity<List<IngredientResponse>> getAll() {
+        return ResponseEntity.ok(ingredientService.getAll());
     }
 }

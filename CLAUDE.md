@@ -32,7 +32,7 @@ Swagger UI is served at `/swagger-ui.html`, OpenAPI JSON at `/v3/api-docs`.
 
 Standard layered structure, one package per concern under `com.josemaba.marquesitasapi`:
 
-- `controller` — REST endpoints, one per aggregate (Category, Product, ProductAddon, ProductDetail, Order). Delegates directly to services; no business logic here.
+- `controller` — REST endpoints, one per aggregate (Category, Product, Ingredient, ProductRecipeDetail, Order). Delegates directly to services; no business logic here.
 - `service` / `service.impl` — interface + implementation per aggregate. All business rules and transactions (`@Transactional`) live here.
 - `repository` — Spring Data JPA repositories.
 - `entity` — JPA entities, all using `UUID` (GenerationType.UUID) primary keys, Lombok `@Builder`/`@Getter`/`@Setter`, and `@EqualsAndHashCode(of = "id")`.
@@ -43,16 +43,17 @@ Standard layered structure, one package per concern under `com.josemaba.marquesi
 ### Domain model
 
 - `Category` 1—N `Product`.
-- `Product` 1—N `ProductDetail`, where `ProductDetail` is the join entity linking a `Product` to the `ProductAddon`s it's allowed to be ordered with (unique on `product_id, addon_id`). This is a catalog-level association, not part of an order.
-- `Order` 1—N `OrderDetail` (line items) 1—N `OrderDetailAddon` (addons selected for that line item, snapshotting `addonName`/`unitPrice` at order time so historical orders are unaffected by later catalog price changes).
-- `Order.orderDetails` and `OrderDetail.orderDetailAddons` cascade `ALL` + `orphanRemoval` from their parent — build/modify order graphs by setting the collection on the parent (see `OrderServiceImpl.buildOrderDetail`), not by saving child entities directly.
+- `Ingredient` is the single catalog of ingredients — both what a product's base recipe is made of and what can be sold as an extra. There is no separate "addon" concept; an addon is just an ingredient with `isBase = false` on a given product.
+- `Product` 1—N `ProductRecipeDetail`, the join entity linking a `Product` to the `Ingredient`s in its recipe (unique on `product_id, ingredient_id`). `ProductRecipeDetail.isBase` distinguishes ingredients that come standard on the product (`true`, customer may ask to remove them) from optional extras (`false`, customer may add them for `Ingredient.price`). This is a catalog-level association, not part of an order.
+- `Order` 1—N `OrderDetail` (line items) 1—N `OrderDetailIngredient`, which records only the *customizations* to a line item relative to the product's base recipe: a row with `action = ADDED` (an extra the customer added) or `action = REMOVED` (a base ingredient the customer excluded). Both snapshot `ingredientName`/`unitPrice` at order time so historical orders are unaffected by later catalog changes; a `REMOVED` row always snapshots `unitPrice = 0` since removing an ingredient never discounts the line.
+- `Order.orderDetails` and `OrderDetail.orderDetailIngredients` cascade `ALL` + `orphanRemoval` from their parent — build/modify order graphs by setting the collection on the parent (see `OrderServiceImpl.buildOrderDetail`), not by saving child entities directly.
 - `Order.orderNumber` is a DB-generated, read-only sequential column (`@Generated(event = EventType.INSERT)`, `insertable/updatable = false`) — never set it from application code.
 
 ### Order business rules (`OrderServiceImpl`)
 
 - Order status transitions are constrained by the `ALLOWED_TRANSITIONS` map: `PENDING → {IN_PROGRESS, CANCELLED}`, `IN_PROGRESS → {READY, CANCELLED}`, `READY → {COMPLETED, CANCELLED}`; `COMPLETED`/`CANCELLED` are terminal. Any other transition throws `BusinessRuleViolationException`.
-- When creating an order, each addon selected on a line item must (a) exist, (b) be `available`, and (c) be linked to that product via `ProductDetail` — otherwise a `BusinessRuleViolationException` is thrown.
-- Line subtotals are computed server-side as `(product.price + sum(addon prices)) * quantity`, scaled to 2 decimals with `HALF_UP` rounding — never trust client-supplied totals.
+- When creating an order, `OrderItemRequest.extraIngredientIds` (things to add) and `.removedIngredientIds` (base ingredients to exclude) are each validated: the ingredient must exist, be `available`, and be linked to that product via `ProductRecipeDetail` with the matching `isBase` (`false` for an extra to add, `true` for a base ingredient to remove) — otherwise a `BusinessRuleViolationException` is thrown.
+- Line subtotals are computed server-side as `(product.price + sum(unitPrice of ADDED ingredients)) * quantity`, scaled to 2 decimals with `HALF_UP` rounding — `REMOVED` ingredients never affect the subtotal, and client-supplied totals are never trusted.
 - Payment happens up front (customer pays before preparation begins), matching the real-world "corte de caja" flow — `Order` already carries `paymentMethod` and `completedAt`, but there is no cash-register close-out / reporting endpoint yet.
 
 ### Testing conventions

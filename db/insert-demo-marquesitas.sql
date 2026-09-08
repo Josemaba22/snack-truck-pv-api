@@ -30,8 +30,9 @@ VALUES
     TRUE
 );
 
-INSERT INTO products_addons (name, price, available)
+INSERT INTO ingredients (name, price, available)
 VALUES
+('Tortilla',0,TRUE),
 ('Fresa',15,TRUE),
 ('Platano',15,TRUE),
 ('Nutella',20,TRUE),
@@ -39,10 +40,18 @@ VALUES
 ('Cajeta',15,TRUE),
 ('Oreo',15,TRUE);
 
-INSERT INTO product_details (product_id, addon_id)
-SELECT p.id,a.id
-FROM products p, products_addons a
+-- Receta base de la Marquefresa
+INSERT INTO product_recipe_details (product_id, ingredient_id, is_base)
+SELECT p.id, i.id, TRUE
+FROM products p, ingredients i
 WHERE p.name='Marquefresa'
-AND a.name IN ('Nutella','Lechera','Cajeta','Oreo','Fresa','Platano');
+AND i.name='Tortilla';
+
+-- Extras disponibles para la Marquefresa
+INSERT INTO product_recipe_details (product_id, ingredient_id, is_base)
+SELECT p.id, i.id, FALSE
+FROM products p, ingredients i
+WHERE p.name='Marquefresa'
+AND i.name IN ('Nutella','Lechera','Cajeta','Oreo','Fresa','Platano');
 
 

@@ -4,18 +4,19 @@ import com.josemaba.marquesitasapi.dto.request.OrderItemRequest;
 import com.josemaba.marquesitasapi.dto.request.OrderRequest;
 import com.josemaba.marquesitasapi.dto.request.OrderStatusUpdateRequest;
 import com.josemaba.marquesitasapi.dto.response.OrderResponse;
+import com.josemaba.marquesitasapi.entity.Ingredient;
+import com.josemaba.marquesitasapi.entity.IngredientAction;
 import com.josemaba.marquesitasapi.entity.Order;
 import com.josemaba.marquesitasapi.entity.OrderDetail;
-import com.josemaba.marquesitasapi.entity.OrderDetailAddon;
+import com.josemaba.marquesitasapi.entity.OrderDetailIngredient;
 import com.josemaba.marquesitasapi.entity.OrderStatus;
 import com.josemaba.marquesitasapi.entity.Product;
-import com.josemaba.marquesitasapi.entity.ProductAddon;
 import com.josemaba.marquesitasapi.exception.BusinessRuleViolationException;
 import com.josemaba.marquesitasapi.exception.ResourceNotFoundException;
 import com.josemaba.marquesitasapi.mapper.OrderMapper;
+import com.josemaba.marquesitasapi.repository.IngredientRepository;
 import com.josemaba.marquesitasapi.repository.OrderRepository;
-import com.josemaba.marquesitasapi.repository.ProductAddonRepository;
-import com.josemaba.marquesitasapi.repository.ProductDetailRepository;
+import com.josemaba.marquesitasapi.repository.ProductRecipeDetailRepository;
 import com.josemaba.marquesitasapi.repository.ProductRepository;
 import com.josemaba.marquesitasapi.service.OrderService;
 import java.math.BigDecimal;
@@ -43,8 +44,8 @@ public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
-    private final ProductAddonRepository productAddonRepository;
-    private final ProductDetailRepository productDetailRepository;
+    private final IngredientRepository ingredientRepository;
+    private final ProductRecipeDetailRepository productRecipeDetailRepository;
     private final OrderMapper orderMapper;
 
     @Override
@@ -110,41 +111,60 @@ public class OrderServiceImpl implements OrderService {
             throw new BusinessRuleViolationException("Product is not available: " + product.getId());
         }
 
-        List<UUID> addonIds = item.selectedAddonIds() == null ? List.of() : item.selectedAddonIds();
-        List<OrderDetailAddon> orderDetailAddons = new ArrayList<>();
-        BigDecimal addonsSum = BigDecimal.ZERO;
+        List<OrderDetailIngredient> orderDetailIngredients = new ArrayList<>();
+        BigDecimal extrasSum = BigDecimal.ZERO;
 
-        for (UUID addonId : addonIds) {
-            ProductAddon addon = productAddonRepository.findById(addonId)
-                    .orElseThrow(() -> ResourceNotFoundException.of("ProductAddon", addonId));
-            if (!Boolean.TRUE.equals(addon.getAvailable())) {
-                throw new BusinessRuleViolationException("Addon is not available: " + addonId);
-            }
-            if (!productDetailRepository.existsByProductIdAndAddonId(product.getId(), addonId)) {
-                throw new BusinessRuleViolationException(
-                        "Addon %s is not assigned to product %s".formatted(addonId, product.getId()));
-            }
-            addonsSum = addonsSum.add(addon.getPrice());
-            orderDetailAddons.add(OrderDetailAddon.builder()
-                    .addon(addon)
-                    .addonName(addon.getName())
-                    .unitPrice(addon.getPrice())
+        List<UUID> extraIngredientIds = item.extraIngredientIds() == null ? List.of() : item.extraIngredientIds();
+        for (UUID ingredientId : extraIngredientIds) {
+            Ingredient ingredient = findAvailableRecipeIngredient(product.getId(), ingredientId, false);
+            extrasSum = extrasSum.add(ingredient.getPrice());
+            orderDetailIngredients.add(OrderDetailIngredient.builder()
+                    .ingredient(ingredient)
+                    .ingredientName(ingredient.getName())
+                    .unitPrice(ingredient.getPrice())
+                    .action(IngredientAction.ADDED)
+                    .build());
+        }
+
+        List<UUID> removedIngredientIds = item.removedIngredientIds() == null ? List.of() : item.removedIngredientIds();
+        for (UUID ingredientId : removedIngredientIds) {
+            Ingredient ingredient = findAvailableRecipeIngredient(product.getId(), ingredientId, true);
+            orderDetailIngredients.add(OrderDetailIngredient.builder()
+                    .ingredient(ingredient)
+                    .ingredientName(ingredient.getName())
+                    .unitPrice(BigDecimal.ZERO)
+                    .action(IngredientAction.REMOVED)
                     .build());
         }
 
         BigDecimal quantity = BigDecimal.valueOf(item.quantity());
-        BigDecimal lineSubtotal = product.getPrice().add(addonsSum).multiply(quantity)
+        BigDecimal lineSubtotal = product.getPrice().add(extrasSum).multiply(quantity)
                 .setScale(2, RoundingMode.HALF_UP);
 
         OrderDetail detail = OrderDetail.builder()
                 .product(product)
                 .quantity(item.quantity())
                 .unitPrice(product.getPrice())
-                .orderDetailAddons(orderDetailAddons)
+                .orderDetailIngredients(orderDetailIngredients)
                 .subtotal(lineSubtotal)
                 .build();
-        orderDetailAddons.forEach(orderDetailAddon -> orderDetailAddon.setOrderDetail(detail));
+        orderDetailIngredients.forEach(orderDetailIngredient -> orderDetailIngredient.setOrderDetail(detail));
         return detail;
+    }
+
+    private Ingredient findAvailableRecipeIngredient(UUID productId, UUID ingredientId, boolean expectedIsBase) {
+        Ingredient ingredient = ingredientRepository.findById(ingredientId)
+                .orElseThrow(() -> ResourceNotFoundException.of("Ingredient", ingredientId));
+        if (!Boolean.TRUE.equals(ingredient.getAvailable())) {
+            throw new BusinessRuleViolationException("Ingredient is not available: " + ingredientId);
+        }
+        if (!productRecipeDetailRepository.existsByProductIdAndIngredientIdAndIsBase(productId, ingredientId, expectedIsBase)) {
+            String reason = expectedIsBase
+                    ? "is not part of the base recipe of product %s".formatted(productId)
+                    : "is not available as an extra for product %s".formatted(productId);
+            throw new BusinessRuleViolationException("Ingredient %s %s".formatted(ingredientId, reason));
+        }
+        return ingredient;
     }
 
     private void applyStatusTransition(Order order, OrderStatus target) {

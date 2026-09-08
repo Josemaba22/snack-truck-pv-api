@@ -10,19 +10,20 @@ import static org.mockito.Mockito.verify;
 import com.josemaba.marquesitasapi.dto.request.OrderItemRequest;
 import com.josemaba.marquesitasapi.dto.request.OrderRequest;
 import com.josemaba.marquesitasapi.dto.request.OrderStatusUpdateRequest;
+import com.josemaba.marquesitasapi.entity.Ingredient;
+import com.josemaba.marquesitasapi.entity.IngredientAction;
 import com.josemaba.marquesitasapi.entity.Order;
 import com.josemaba.marquesitasapi.entity.OrderDetail;
-import com.josemaba.marquesitasapi.entity.OrderDetailAddon;
+import com.josemaba.marquesitasapi.entity.OrderDetailIngredient;
 import com.josemaba.marquesitasapi.entity.OrderStatus;
 import com.josemaba.marquesitasapi.entity.PaymentMethod;
 import com.josemaba.marquesitasapi.entity.Product;
-import com.josemaba.marquesitasapi.entity.ProductAddon;
 import com.josemaba.marquesitasapi.exception.BusinessRuleViolationException;
 import com.josemaba.marquesitasapi.exception.ResourceNotFoundException;
 import com.josemaba.marquesitasapi.mapper.OrderMapper;
+import com.josemaba.marquesitasapi.repository.IngredientRepository;
 import com.josemaba.marquesitasapi.repository.OrderRepository;
-import com.josemaba.marquesitasapi.repository.ProductAddonRepository;
-import com.josemaba.marquesitasapi.repository.ProductDetailRepository;
+import com.josemaba.marquesitasapi.repository.ProductRecipeDetailRepository;
 import com.josemaba.marquesitasapi.repository.ProductRepository;
 import java.math.BigDecimal;
 import java.util.List;
@@ -46,10 +47,10 @@ class OrderServiceImplTest {
     private ProductRepository productRepository;
 
     @Mock
-    private ProductAddonRepository productAddonRepository;
+    private IngredientRepository ingredientRepository;
 
     @Mock
-    private ProductDetailRepository productDetailRepository;
+    private ProductRecipeDetailRepository productRecipeDetailRepository;
 
     @Mock
     private OrderMapper orderMapper;
@@ -61,23 +62,23 @@ class OrderServiceImplTest {
     private ArgumentCaptor<Order> orderCaptor;
 
     @Test
-    void create_shouldCalculateLineAndOrderTotals_withAddons() {
+    void create_shouldCalculateLineAndOrderTotals_withExtraIngredients() {
         UUID productId = UUID.randomUUID();
-        UUID addon1Id = UUID.randomUUID();
-        UUID addon2Id = UUID.randomUUID();
+        UUID ingredient1Id = UUID.randomUUID();
+        UUID ingredient2Id = UUID.randomUUID();
 
         Product product = Product.builder().id(productId).name("Marquesita").price(new BigDecimal("45.00")).available(true).build();
-        ProductAddon addon1 = ProductAddon.builder().id(addon1Id).name("Queso extra").price(new BigDecimal("10.00")).available(true).build();
-        ProductAddon addon2 = ProductAddon.builder().id(addon2Id).name("Tocino").price(new BigDecimal("8.00")).available(true).build();
+        Ingredient ingredient1 = Ingredient.builder().id(ingredient1Id).name("Queso extra").price(new BigDecimal("10.00")).available(true).build();
+        Ingredient ingredient2 = Ingredient.builder().id(ingredient2Id).name("Tocino").price(new BigDecimal("8.00")).available(true).build();
 
-        OrderItemRequest item = new OrderItemRequest(productId, 2, List.of(addon1Id, addon2Id));
+        OrderItemRequest item = new OrderItemRequest(productId, 2, List.of(ingredient1Id, ingredient2Id), null);
         OrderRequest request = new OrderRequest(List.of(item), "sin cebolla", PaymentMethod.CASH);
 
         given(productRepository.findById(productId)).willReturn(Optional.of(product));
-        given(productAddonRepository.findById(addon1Id)).willReturn(Optional.of(addon1));
-        given(productAddonRepository.findById(addon2Id)).willReturn(Optional.of(addon2));
-        given(productDetailRepository.existsByProductIdAndAddonId(productId, addon1Id)).willReturn(true);
-        given(productDetailRepository.existsByProductIdAndAddonId(productId, addon2Id)).willReturn(true);
+        given(ingredientRepository.findById(ingredient1Id)).willReturn(Optional.of(ingredient1));
+        given(ingredientRepository.findById(ingredient2Id)).willReturn(Optional.of(ingredient2));
+        given(productRecipeDetailRepository.existsByProductIdAndIngredientIdAndIsBase(productId, ingredient1Id, false)).willReturn(true);
+        given(productRecipeDetailRepository.existsByProductIdAndIngredientIdAndIsBase(productId, ingredient2Id, false)).willReturn(true);
         given(orderRepository.save(any(Order.class))).willAnswer(invocation -> invocation.getArgument(0));
 
         orderService.create(request);
@@ -94,15 +95,47 @@ class OrderServiceImplTest {
         assertThat(line.getUnitPrice()).isEqualByComparingTo("45.00");
         assertThat(line.getSubtotal()).isEqualByComparingTo("126.00");
         assertThat(line.getOrder()).isEqualTo(savedOrder);
-        assertThat(line.getOrderDetailAddons()).extracting(OrderDetailAddon::getUnitPrice)
+        assertThat(line.getOrderDetailIngredients()).extracting(OrderDetailIngredient::getUnitPrice)
                 .containsExactlyInAnyOrder(new BigDecimal("10.00"), new BigDecimal("8.00"));
-        assertThat(line.getOrderDetailAddons()).allSatisfy(addon -> assertThat(addon.getOrderDetail()).isEqualTo(line));
+        assertThat(line.getOrderDetailIngredients()).allSatisfy(ingredient -> {
+            assertThat(ingredient.getOrderDetail()).isEqualTo(line);
+            assertThat(ingredient.getAction()).isEqualTo(IngredientAction.ADDED);
+        });
+    }
+
+    @Test
+    void create_shouldApplyRemovedIngredient_withoutAffectingSubtotal() {
+        UUID productId = UUID.randomUUID();
+        UUID ingredientId = UUID.randomUUID();
+
+        Product product = Product.builder().id(productId).name("Marquesita").price(new BigDecimal("45.00")).available(true).build();
+        Ingredient ingredient = Ingredient.builder().id(ingredientId).name("Nutella").price(new BigDecimal("20.00")).available(true).build();
+
+        OrderItemRequest item = new OrderItemRequest(productId, 1, null, List.of(ingredientId));
+        OrderRequest request = new OrderRequest(List.of(item), null, PaymentMethod.CASH);
+
+        given(productRepository.findById(productId)).willReturn(Optional.of(product));
+        given(ingredientRepository.findById(ingredientId)).willReturn(Optional.of(ingredient));
+        given(productRecipeDetailRepository.existsByProductIdAndIngredientIdAndIsBase(productId, ingredientId, true)).willReturn(true);
+        given(orderRepository.save(any(Order.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        orderService.create(request);
+
+        verify(orderRepository).save(orderCaptor.capture());
+        Order savedOrder = orderCaptor.getValue();
+
+        assertThat(savedOrder.getSubtotal()).isEqualByComparingTo("45.00");
+        OrderDetail line = savedOrder.getOrderDetails().get(0);
+        assertThat(line.getOrderDetailIngredients()).hasSize(1);
+        OrderDetailIngredient removed = line.getOrderDetailIngredients().get(0);
+        assertThat(removed.getAction()).isEqualTo(IngredientAction.REMOVED);
+        assertThat(removed.getUnitPrice()).isEqualByComparingTo("0.00");
     }
 
     @Test
     void create_shouldThrowResourceNotFoundException_whenProductDoesNotExist() {
         UUID productId = UUID.randomUUID();
-        OrderItemRequest item = new OrderItemRequest(productId, 1, null);
+        OrderItemRequest item = new OrderItemRequest(productId, 1, null, null);
         OrderRequest request = new OrderRequest(List.of(item), null, PaymentMethod.CASH);
         given(productRepository.findById(productId)).willReturn(Optional.empty());
 
@@ -115,7 +148,7 @@ class OrderServiceImplTest {
     void create_shouldThrowBusinessRuleViolationException_whenProductNotAvailable() {
         UUID productId = UUID.randomUUID();
         Product product = Product.builder().id(productId).name("Marquesita").price(BigDecimal.TEN).available(false).build();
-        OrderItemRequest item = new OrderItemRequest(productId, 1, null);
+        OrderItemRequest item = new OrderItemRequest(productId, 1, null, null);
         OrderRequest request = new OrderRequest(List.of(item), null, PaymentMethod.CASH);
         given(productRepository.findById(productId)).willReturn(Optional.of(product));
 
@@ -125,45 +158,61 @@ class OrderServiceImplTest {
     }
 
     @Test
-    void create_shouldThrowResourceNotFoundException_whenAddonDoesNotExist() {
+    void create_shouldThrowResourceNotFoundException_whenIngredientDoesNotExist() {
         UUID productId = UUID.randomUUID();
-        UUID addonId = UUID.randomUUID();
+        UUID ingredientId = UUID.randomUUID();
         Product product = Product.builder().id(productId).name("Marquesita").price(BigDecimal.TEN).available(true).build();
-        OrderItemRequest item = new OrderItemRequest(productId, 1, List.of(addonId));
+        OrderItemRequest item = new OrderItemRequest(productId, 1, List.of(ingredientId), null);
         OrderRequest request = new OrderRequest(List.of(item), null, PaymentMethod.CASH);
         given(productRepository.findById(productId)).willReturn(Optional.of(product));
-        given(productAddonRepository.findById(addonId)).willReturn(Optional.empty());
+        given(ingredientRepository.findById(ingredientId)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> orderService.create(request))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
-    void create_shouldThrowBusinessRuleViolationException_whenAddonNotAvailable() {
+    void create_shouldThrowBusinessRuleViolationException_whenIngredientNotAvailable() {
         UUID productId = UUID.randomUUID();
-        UUID addonId = UUID.randomUUID();
+        UUID ingredientId = UUID.randomUUID();
         Product product = Product.builder().id(productId).name("Marquesita").price(BigDecimal.TEN).available(true).build();
-        ProductAddon addon = ProductAddon.builder().id(addonId).name("Jalapenos").price(BigDecimal.ONE).available(false).build();
-        OrderItemRequest item = new OrderItemRequest(productId, 1, List.of(addonId));
+        Ingredient ingredient = Ingredient.builder().id(ingredientId).name("Jalapenos").price(BigDecimal.ONE).available(false).build();
+        OrderItemRequest item = new OrderItemRequest(productId, 1, List.of(ingredientId), null);
         OrderRequest request = new OrderRequest(List.of(item), null, PaymentMethod.CASH);
         given(productRepository.findById(productId)).willReturn(Optional.of(product));
-        given(productAddonRepository.findById(addonId)).willReturn(Optional.of(addon));
+        given(ingredientRepository.findById(ingredientId)).willReturn(Optional.of(ingredient));
 
         assertThatThrownBy(() -> orderService.create(request))
                 .isInstanceOf(BusinessRuleViolationException.class);
     }
 
     @Test
-    void create_shouldThrowBusinessRuleViolationException_whenAddonNotAssignedToProduct() {
+    void create_shouldThrowBusinessRuleViolationException_whenIngredientNotAvailableAsExtraForProduct() {
         UUID productId = UUID.randomUUID();
-        UUID addonId = UUID.randomUUID();
+        UUID ingredientId = UUID.randomUUID();
         Product product = Product.builder().id(productId).name("Marquesita").price(BigDecimal.TEN).available(true).build();
-        ProductAddon addon = ProductAddon.builder().id(addonId).name("Jalapenos").price(BigDecimal.ONE).available(true).build();
-        OrderItemRequest item = new OrderItemRequest(productId, 1, List.of(addonId));
+        Ingredient ingredient = Ingredient.builder().id(ingredientId).name("Jalapenos").price(BigDecimal.ONE).available(true).build();
+        OrderItemRequest item = new OrderItemRequest(productId, 1, List.of(ingredientId), null);
         OrderRequest request = new OrderRequest(List.of(item), null, PaymentMethod.CASH);
         given(productRepository.findById(productId)).willReturn(Optional.of(product));
-        given(productAddonRepository.findById(addonId)).willReturn(Optional.of(addon));
-        given(productDetailRepository.existsByProductIdAndAddonId(productId, addonId)).willReturn(false);
+        given(ingredientRepository.findById(ingredientId)).willReturn(Optional.of(ingredient));
+        given(productRecipeDetailRepository.existsByProductIdAndIngredientIdAndIsBase(productId, ingredientId, false)).willReturn(false);
+
+        assertThatThrownBy(() -> orderService.create(request))
+                .isInstanceOf(BusinessRuleViolationException.class);
+    }
+
+    @Test
+    void create_shouldThrowBusinessRuleViolationException_whenRemovedIngredientNotPartOfBaseRecipe() {
+        UUID productId = UUID.randomUUID();
+        UUID ingredientId = UUID.randomUUID();
+        Product product = Product.builder().id(productId).name("Marquesita").price(BigDecimal.TEN).available(true).build();
+        Ingredient ingredient = Ingredient.builder().id(ingredientId).name("Nutella").price(BigDecimal.ONE).available(true).build();
+        OrderItemRequest item = new OrderItemRequest(productId, 1, null, List.of(ingredientId));
+        OrderRequest request = new OrderRequest(List.of(item), null, PaymentMethod.CASH);
+        given(productRepository.findById(productId)).willReturn(Optional.of(product));
+        given(ingredientRepository.findById(ingredientId)).willReturn(Optional.of(ingredient));
+        given(productRecipeDetailRepository.existsByProductIdAndIngredientIdAndIsBase(productId, ingredientId, true)).willReturn(false);
 
         assertThatThrownBy(() -> orderService.create(request))
                 .isInstanceOf(BusinessRuleViolationException.class);

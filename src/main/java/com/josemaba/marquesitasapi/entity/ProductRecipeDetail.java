@@ -1,5 +1,6 @@
 package com.josemaba.marquesitasapi.entity;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -19,15 +20,15 @@ import lombok.Setter;
 import lombok.ToString;
 
 @Entity
-@Table(name = "product_details", uniqueConstraints = @UniqueConstraint(columnNames = {"product_id", "addon_id"}))
+@Table(name = "product_recipe_details", uniqueConstraints = @UniqueConstraint(columnNames = {"product_id", "ingredient_id"}))
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 @EqualsAndHashCode(of = "id")
-@ToString(exclude = {"product", "addon"})
-public class ProductDetail {
+@ToString(exclude = {"product", "ingredient"})
+public class ProductRecipeDetail {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -38,6 +39,10 @@ public class ProductDetail {
     private Product product;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "addon_id", nullable = false)
-    private ProductAddon addon;
+    @JoinColumn(name = "ingredient_id", nullable = false)
+    private Ingredient ingredient;
+
+    @Column(name = "is_base", nullable = false)
+    @Builder.Default
+    private Boolean isBase = true;
 }

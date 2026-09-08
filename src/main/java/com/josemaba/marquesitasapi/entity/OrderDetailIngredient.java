@@ -2,6 +2,8 @@ package com.josemaba.marquesitasapi.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -20,15 +22,15 @@ import lombok.Setter;
 import lombok.ToString;
 
 @Entity
-@Table(name = "order_detail_addons")
+@Table(name = "order_detail_ingredients")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 @EqualsAndHashCode(of = "id")
-@ToString(exclude = {"orderDetail", "addon"})
-public class OrderDetailAddon {
+@ToString(exclude = {"orderDetail", "ingredient"})
+public class OrderDetailIngredient {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -39,12 +41,16 @@ public class OrderDetailAddon {
     private OrderDetail orderDetail;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "addon_id", nullable = false)
-    private ProductAddon addon;
+    @JoinColumn(name = "ingredient_id", nullable = false)
+    private Ingredient ingredient;
 
-    @Column(name = "addon_name", nullable = false, length = 100)
-    private String addonName;
+    @Column(name = "ingredient_name", nullable = false, length = 100)
+    private String ingredientName;
 
     @Column(name = "unit_price", nullable = false, precision = 10, scale = 2)
     private BigDecimal unitPrice;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10)
+    private IngredientAction action;
 }

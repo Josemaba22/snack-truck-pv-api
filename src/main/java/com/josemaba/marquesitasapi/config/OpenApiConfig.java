@@ -16,7 +16,7 @@ public class OpenApiConfig {
                 .info(new Info()
                         .title("Marquesitas API")
                         .description("REST API for administering a snack food truck: categories, products, "
-                                + "addons, product-addon associations and orders with automatic subtotal/total calculation.")
+                                + "ingredients, product recipes and orders with automatic subtotal/total calculation.")
                         .version("v1.0.0")
                         .contact(new Contact().name("Jose Barraza").email("Josemaba_22@hotmail.com"))
                         .license(new License().name("Proprietary")));

@@ -17,7 +17,7 @@ import lombok.Setter;
 import lombok.ToString;
 
 @Entity
-@Table(name = "products_addons")
+@Table(name = "ingredients")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -25,7 +25,7 @@ import lombok.ToString;
 @Builder
 @EqualsAndHashCode(of = "id")
 @ToString
-public class ProductAddon {
+public class Ingredient {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
