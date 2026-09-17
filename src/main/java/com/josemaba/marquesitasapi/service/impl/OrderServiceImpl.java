@@ -65,6 +65,7 @@ public class OrderServiceImpl implements OrderService {
                 .subtotal(orderSubtotal)
                 .total(orderSubtotal)
                 .notes(request.notes())
+                .customerName(request.customerName())
                 .paymentMethod(request.paymentMethod())
                 .orderDetails(details)
                 .build();

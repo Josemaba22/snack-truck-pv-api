@@ -90,6 +90,8 @@ CREATE TABLE orders (
 
     notes TEXT,
 
+    customer_name VARCHAR(120),
+
     payment_method VARCHAR(20) NOT NULL,
 
     created_at TIMESTAMP WITHOUT TIME ZONE
