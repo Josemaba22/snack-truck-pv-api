@@ -51,7 +51,7 @@ Standard layered structure, one package per concern under `com.josemaba.marquesi
 
 ### Order business rules (`OrderServiceImpl`)
 
-- Order status transitions are constrained by the `ALLOWED_TRANSITIONS` map: `PENDING → {IN_PROGRESS, CANCELLED}`, `IN_PROGRESS → {READY, CANCELLED}`, `READY → {COMPLETED, CANCELLED}`; `COMPLETED`/`CANCELLED` are terminal. Any other transition throws `BusinessRuleViolationException`.
+- Order status transitions are constrained by the `ALLOWED_TRANSITIONS` map: `PENDING`, `IN_PROGRESS`, and `READY` can move forward or backward among each other (e.g. `READY → IN_PROGRESS`) to support the frontend correcting an order's stage, and any of the three can move to `CANCELLED`; only `READY → COMPLETED` progresses to completion. `COMPLETED`/`CANCELLED` are terminal. Any other transition throws `BusinessRuleViolationException`.
 - When creating an order, `OrderItemRequest.extraIngredientIds` (things to add) and `.removedIngredientIds` (base ingredients to exclude) are each validated: the ingredient must exist, be `available`, and be linked to that product via `ProductRecipeDetail` with the matching `isBase` (`false` for an extra to add, `true` for a base ingredient to remove) — otherwise a `BusinessRuleViolationException` is thrown.
 - Line subtotals are computed server-side as `(product.price + sum(unitPrice of ADDED ingredients)) * quantity`, scaled to 2 decimals with `HALF_UP` rounding — `REMOVED` ingredients never affect the subtotal, and client-supplied totals are never trusted.
 - Payment happens up front (customer pays before preparation begins), matching the real-world "corte de caja" flow — `Order` already carries `paymentMethod` and `completedAt`, but there is no cash-register close-out / reporting endpoint yet.

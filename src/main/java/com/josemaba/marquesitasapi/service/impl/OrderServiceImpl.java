@@ -36,9 +36,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class OrderServiceImpl implements OrderService {
 
     private static final Map<OrderStatus, Set<OrderStatus>> ALLOWED_TRANSITIONS = Map.of(
-            OrderStatus.PENDING, Set.of(OrderStatus.IN_PROGRESS, OrderStatus.CANCELLED),
-            OrderStatus.IN_PROGRESS, Set.of(OrderStatus.READY, OrderStatus.CANCELLED),
-            OrderStatus.READY, Set.of(OrderStatus.COMPLETED, OrderStatus.CANCELLED),
+            OrderStatus.PENDING, Set.of(OrderStatus.IN_PROGRESS, OrderStatus.READY, OrderStatus.CANCELLED),
+            OrderStatus.IN_PROGRESS, Set.of(OrderStatus.PENDING, OrderStatus.READY, OrderStatus.CANCELLED),
+            OrderStatus.READY, Set.of(OrderStatus.PENDING, OrderStatus.IN_PROGRESS, OrderStatus.COMPLETED, OrderStatus.CANCELLED),
             OrderStatus.COMPLETED, Set.of(),
             OrderStatus.CANCELLED, Set.of());
 
