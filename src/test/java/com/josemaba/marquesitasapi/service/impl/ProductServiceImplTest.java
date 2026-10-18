@@ -15,6 +15,12 @@ import com.josemaba.marquesitasapi.exception.ResourceNotFoundException;
 import com.josemaba.marquesitasapi.mapper.ProductMapper;
 import com.josemaba.marquesitasapi.repository.CategoryRepository;
 import com.josemaba.marquesitasapi.repository.ProductRepository;
+import com.josemaba.marquesitasapi.storage.ImageStorage;
+import com.josemaba.marquesitasapi.exception.InvalidImageException;
+import java.io.IOException;
+import java.io.InputStream;
+import org.mockito.ArgumentMatchers;
+import org.springframework.mock.web.MockMultipartFile;
 import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
@@ -35,6 +41,9 @@ class ProductServiceImplTest {
 
     @Mock
     private ProductMapper productMapper;
+
+    @Mock
+    private ImageStorage imageStorage;
 
     @InjectMocks
     private ProductServiceImpl productService;
@@ -59,7 +68,7 @@ class ProductServiceImplTest {
         Product saved = Product.builder().id(UUID.randomUUID()).name("Marquesita").category(category)
                 .price(new BigDecimal("45.00")).available(true).build();
         ProductResponse response = new ProductResponse(saved.getId(), "Marquesita", "desc", new BigDecimal("45.00"),
-                categoryId, "Marquesitas", true, null);
+                categoryId, "Marquesitas", true, null, null);
 
         given(categoryRepository.findById(categoryId)).willReturn(Optional.of(category));
         given(productMapper.toEntity(request)).willReturn(entity);
@@ -82,5 +91,50 @@ class ProductServiceImplTest {
         assertThatThrownBy(() -> productService.update(id, request))
                 .isInstanceOf(ResourceNotFoundException.class);
         verify(productRepository, never()).save(any());
+    }
+
+    private static final byte[] PNG = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0};
+
+    @Test
+    void uploadImage_shouldStoreNewImageAndDeleteOldOne_whenProductHasImage() throws IOException {
+        UUID id = UUID.randomUUID();
+        Product product = Product.builder().id(id).name("Marquesita").imageKey("products/old.png").build();
+        MockMultipartFile file = new MockMultipartFile("file", "x.png", "image/png", PNG);
+        given(productRepository.findById(id)).willReturn(Optional.of(product));
+        given(imageStorage.store(ArgumentMatchers.eq("products"), ArgumentMatchers.eq("png"),
+                ArgumentMatchers.eq("image/png"), any(InputStream.class), ArgumentMatchers.anyLong()))
+                .willReturn("products/new.png");
+        given(productRepository.save(product)).willReturn(product);
+
+        productService.uploadImage(id, file);
+
+        assertThat(product.getImageKey()).isEqualTo("products/new.png");
+        verify(imageStorage).delete("products/old.png");
+    }
+
+    @Test
+    void uploadImage_shouldThrowInvalidImageException_whenFileIsNotAnImage() {
+        UUID id = UUID.randomUUID();
+        Product product = Product.builder().id(id).name("Marquesita").build();
+        MockMultipartFile file = new MockMultipartFile("file", "x.png", "image/png", "not an image!".getBytes());
+        given(productRepository.findById(id)).willReturn(Optional.of(product));
+
+        assertThatThrownBy(() -> productService.uploadImage(id, file))
+                .isInstanceOf(InvalidImageException.class);
+        verify(imageStorage, never()).delete(any());
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void deleteImage_shouldClearKeyAndDeleteFromStorage_whenProductHasImage() {
+        UUID id = UUID.randomUUID();
+        Product product = Product.builder().id(id).name("Marquesita").imageKey("products/old.png").build();
+        given(productRepository.findById(id)).willReturn(Optional.of(product));
+        given(productRepository.save(product)).willReturn(product);
+
+        productService.deleteImage(id);
+
+        assertThat(product.getImageKey()).isNull();
+        verify(imageStorage).delete("products/old.png");
     }
 }

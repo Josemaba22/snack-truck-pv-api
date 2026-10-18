@@ -8,6 +8,11 @@ spring:
     password: ${DB_PASSWORD:123}
     driver-class-name: org.postgresql.Driver
 
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+
   jpa:
     open-in-view: false
     hibernate:
@@ -18,6 +23,15 @@ spring:
         jdbc:
           time_zone: UTC
     show-sql: false
+
+app:
+  storage:
+    # Image storage backend. Only "local" is implemented; add a new ImageStorage bean for other providers.
+    provider: ${STORAGE_PROVIDER:local}
+    # Base URL clients use to reach this API; prefixed to image paths in responses.
+    public-base-url: ${STORAGE_PUBLIC_BASE_URL:http://localhost:8081}
+    local:
+      path: ${STORAGE_LOCAL_PATH:./uploads}
 
 server:
   port: ${SERVER_PORT:8081}

@@ -26,6 +26,7 @@ CREATE TABLE products (
     price NUMERIC(10,2) NOT NULL CHECK (price >= 0),
     category_id UUID NOT NULL,
     available BOOLEAN NOT NULL DEFAULT TRUE,
+    image_key VARCHAR(255),
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_products_category

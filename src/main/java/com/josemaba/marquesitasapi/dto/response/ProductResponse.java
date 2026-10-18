@@ -12,5 +12,6 @@ public record ProductResponse(
         UUID categoryId,
         String categoryName,
         Boolean available,
+        String imageUrl,
         LocalDateTime createdAt) {
 }

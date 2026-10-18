@@ -8,22 +8,25 @@ import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.ReportingPolicy;
 
-@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE, uses = ImageUrlResolver.class)
 public interface ProductMapper {
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "category", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "imageKey", ignore = true)
     @Mapping(target = "available", source = "available", defaultValue = "true")
     Product toEntity(ProductRequest request);
 
     @Mapping(target = "categoryId", source = "category.id")
     @Mapping(target = "categoryName", source = "category.name")
+    @Mapping(target = "imageUrl", source = "imageKey", qualifiedByName = "imageUrl")
     ProductResponse toResponse(Product product);
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "category", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "imageKey", ignore = true)
     @Mapping(target = "available", source = "available", defaultValue = "true")
     void updateEntityFromRequest(ProductRequest request, @MappingTarget Product product);
 }
