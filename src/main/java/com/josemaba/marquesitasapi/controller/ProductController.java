@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
@@ -32,7 +33,7 @@ public class ProductController {
 
     private final ProductService productService;
 
-    @PostMapping
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Create a product")
     public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest request) {
         ProductResponse response = productService.create(request);
@@ -43,7 +44,29 @@ public class ProductController {
         return ResponseEntity.created(location).body(response);
     }
 
-    @PutMapping("/{id}")
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Create a product with an optional image (parts: product as JSON, image as JPEG/PNG/WebP)")
+    public ResponseEntity<ProductResponse> createWithImage(
+            @Valid @RequestPart("product") ProductRequest request,
+            @RequestPart(value = "image", required = false) MultipartFile image) {
+        ProductResponse response = productService.create(request, image);
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(response.id())
+                .toUri();
+        return ResponseEntity.created(location).body(response);
+    }
+
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Update a product, optionally replacing its image (parts: product as JSON, image)")
+    public ResponseEntity<ProductResponse> updateWithImage(
+            @PathVariable UUID id,
+            @Valid @RequestPart("product") ProductRequest request,
+            @RequestPart(value = "image", required = false) MultipartFile image) {
+        return ResponseEntity.ok(productService.update(id, request, image));
+    }
+
+    @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Update a product")
     public ResponseEntity<ProductResponse> update(@PathVariable UUID id, @Valid @RequestBody ProductRequest request) {
         return ResponseEntity.ok(productService.update(id, request));

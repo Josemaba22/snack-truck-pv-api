@@ -36,21 +36,57 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional
     public ProductResponse create(ProductRequest request) {
+        return create(request, null);
+    }
+
+    @Override
+    @Transactional
+    public ProductResponse create(ProductRequest request, MultipartFile image) {
         Category category = findCategory(request.categoryId());
         Product product = productMapper.toEntity(request);
         product.setCategory(category);
-        Product saved = productRepository.save(product);
-        return productMapper.toResponse(saved);
+        String newKey = hasImage(image) ? storeImage(image) : null;
+        product.setImageKey(newKey);
+        try {
+            return productMapper.toResponse(productRepository.save(product));
+        } catch (RuntimeException ex) {
+            if (newKey != null) {
+                imageStorage.delete(newKey);
+            }
+            throw ex;
+        }
     }
 
     @Override
     @Transactional
     public ProductResponse update(UUID id, ProductRequest request) {
+        return update(id, request, null);
+    }
+
+    @Override
+    @Transactional
+    public ProductResponse update(UUID id, ProductRequest request, MultipartFile image) {
         Product product = findProduct(id);
         Category category = findCategory(request.categoryId());
         productMapper.updateEntityFromRequest(request, product);
         product.setCategory(category);
-        Product saved = productRepository.save(product);
+        String oldKey = product.getImageKey();
+        String newKey = hasImage(image) ? storeImage(image) : null;
+        if (newKey != null) {
+            product.setImageKey(newKey);
+        }
+        Product saved;
+        try {
+            saved = productRepository.save(product);
+        } catch (RuntimeException ex) {
+            if (newKey != null) {
+                imageStorage.delete(newKey);
+            }
+            throw ex;
+        }
+        if (newKey != null && oldKey != null) {
+            imageStorage.delete(oldKey);
+        }
         return productMapper.toResponse(saved);
     }
 
@@ -69,13 +105,7 @@ public class ProductServiceImpl implements ProductService {
     @Transactional
     public ProductResponse uploadImage(UUID id, MultipartFile file) {
         Product product = findProduct(id);
-        ValidatedImage image = ImageValidator.validate(file);
-        String newKey;
-        try (InputStream content = file.getInputStream()) {
-            newKey = imageStorage.store(IMAGE_FOLDER, image.extension(), image.contentType(), content, file.getSize());
-        } catch (IOException ex) {
-            throw new UncheckedIOException("Could not store image", ex);
-        }
+        String newKey = storeImage(file);
         String oldKey = product.getImageKey();
         product.setImageKey(newKey);
         Product saved = productRepository.save(product);
@@ -110,6 +140,19 @@ public class ProductServiceImpl implements ProductService {
         return productRepository.findAll().stream()
                 .map(productMapper::toResponse)
                 .toList();
+    }
+
+    private boolean hasImage(MultipartFile image) {
+        return image != null && !image.isEmpty();
+    }
+
+    private String storeImage(MultipartFile file) {
+        ValidatedImage image = ImageValidator.validate(file);
+        try (InputStream content = file.getInputStream()) {
+            return imageStorage.store(IMAGE_FOLDER, image.extension(), image.contentType(), content, file.getSize());
+        } catch (IOException ex) {
+            throw new UncheckedIOException("Could not store image", ex);
+        }
     }
 
     private Product findProduct(UUID id) {

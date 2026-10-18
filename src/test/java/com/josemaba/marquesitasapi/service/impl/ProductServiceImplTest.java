@@ -137,4 +137,131 @@ class ProductServiceImplTest {
         assertThat(product.getImageKey()).isNull();
         verify(imageStorage).delete("products/old.png");
     }
+
+    private void givenImageStoredAs(String key) throws IOException {
+        given(imageStorage.store(ArgumentMatchers.eq("products"), ArgumentMatchers.eq("png"),
+                ArgumentMatchers.eq("image/png"), any(InputStream.class), ArgumentMatchers.anyLong()))
+                .willReturn(key);
+    }
+
+    @Test
+    void createWithImage_shouldStoreImageAndSetKey_whenImageProvided() throws IOException {
+        UUID categoryId = UUID.randomUUID();
+        Category category = Category.builder().id(categoryId).name("Marquesitas").displayOrder(1).build();
+        ProductRequest request = new ProductRequest("Marquesita", "desc", new BigDecimal("45.00"), categoryId, true);
+        Product entity = Product.builder().name("Marquesita").build();
+        MockMultipartFile image = new MockMultipartFile("image", "x.png", "image/png", PNG);
+        given(categoryRepository.findById(categoryId)).willReturn(Optional.of(category));
+        given(productMapper.toEntity(request)).willReturn(entity);
+        givenImageStoredAs("products/new.png");
+        given(productRepository.save(entity)).willReturn(entity);
+
+        productService.create(request, image);
+
+        assertThat(entity.getImageKey()).isEqualTo("products/new.png");
+        assertThat(entity.getCategory()).isEqualTo(category);
+    }
+
+    @Test
+    void createWithImage_shouldNotTouchStorage_whenImageIsNullOrEmpty() {
+        UUID categoryId = UUID.randomUUID();
+        Category category = Category.builder().id(categoryId).name("Marquesitas").displayOrder(1).build();
+        ProductRequest request = new ProductRequest("Marquesita", "desc", new BigDecimal("45.00"), categoryId, true);
+        Product entity = Product.builder().name("Marquesita").build();
+        given(categoryRepository.findById(categoryId)).willReturn(Optional.of(category));
+        given(productMapper.toEntity(request)).willReturn(entity);
+        given(productRepository.save(entity)).willReturn(entity);
+
+        productService.create(request, new MockMultipartFile("image", new byte[0]));
+
+        assertThat(entity.getImageKey()).isNull();
+        verify(imageStorage, never()).delete(any());
+    }
+
+    @Test
+    void createWithImage_shouldThrowInvalidImageException_whenFileIsNotAnImage() {
+        UUID categoryId = UUID.randomUUID();
+        Category category = Category.builder().id(categoryId).name("Marquesitas").displayOrder(1).build();
+        ProductRequest request = new ProductRequest("Marquesita", "desc", new BigDecimal("45.00"), categoryId, true);
+        Product entity = Product.builder().name("Marquesita").build();
+        MockMultipartFile image = new MockMultipartFile("image", "x.png", "image/png", "not an image!".getBytes());
+        given(categoryRepository.findById(categoryId)).willReturn(Optional.of(category));
+        given(productMapper.toEntity(request)).willReturn(entity);
+
+        assertThatThrownBy(() -> productService.create(request, image))
+                .isInstanceOf(InvalidImageException.class);
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void createWithImage_shouldDeleteStoredImage_whenSaveFails() throws IOException {
+        UUID categoryId = UUID.randomUUID();
+        Category category = Category.builder().id(categoryId).name("Marquesitas").displayOrder(1).build();
+        ProductRequest request = new ProductRequest("Marquesita", "desc", new BigDecimal("45.00"), categoryId, true);
+        Product entity = Product.builder().name("Marquesita").build();
+        MockMultipartFile image = new MockMultipartFile("image", "x.png", "image/png", PNG);
+        given(categoryRepository.findById(categoryId)).willReturn(Optional.of(category));
+        given(productMapper.toEntity(request)).willReturn(entity);
+        givenImageStoredAs("products/new.png");
+        given(productRepository.save(entity)).willThrow(new IllegalStateException("db down"));
+
+        assertThatThrownBy(() -> productService.create(request, image))
+                .isInstanceOf(IllegalStateException.class);
+        verify(imageStorage).delete("products/new.png");
+    }
+
+    @Test
+    void updateWithImage_shouldReplaceImageAndDeleteOldOne_whenImageProvided() throws IOException {
+        UUID id = UUID.randomUUID();
+        UUID categoryId = UUID.randomUUID();
+        Category category = Category.builder().id(categoryId).name("Marquesitas").displayOrder(1).build();
+        Product product = Product.builder().id(id).name("Marquesita").imageKey("products/old.png").build();
+        ProductRequest request = new ProductRequest("Marquesita", null, BigDecimal.TEN, categoryId, true);
+        MockMultipartFile image = new MockMultipartFile("image", "x.png", "image/png", PNG);
+        given(productRepository.findById(id)).willReturn(Optional.of(product));
+        given(categoryRepository.findById(categoryId)).willReturn(Optional.of(category));
+        givenImageStoredAs("products/new.png");
+        given(productRepository.save(product)).willReturn(product);
+
+        productService.update(id, request, image);
+
+        assertThat(product.getImageKey()).isEqualTo("products/new.png");
+        verify(imageStorage).delete("products/old.png");
+    }
+
+    @Test
+    void updateWithImage_shouldKeepExistingImage_whenNoImageProvided() {
+        UUID id = UUID.randomUUID();
+        UUID categoryId = UUID.randomUUID();
+        Category category = Category.builder().id(categoryId).name("Marquesitas").displayOrder(1).build();
+        Product product = Product.builder().id(id).name("Marquesita").imageKey("products/old.png").build();
+        ProductRequest request = new ProductRequest("Marquesita", null, BigDecimal.TEN, categoryId, true);
+        given(productRepository.findById(id)).willReturn(Optional.of(product));
+        given(categoryRepository.findById(categoryId)).willReturn(Optional.of(category));
+        given(productRepository.save(product)).willReturn(product);
+
+        productService.update(id, request, null);
+
+        assertThat(product.getImageKey()).isEqualTo("products/old.png");
+        verify(imageStorage, never()).delete(any());
+    }
+
+    @Test
+    void updateWithImage_shouldDeleteNewImageAndKeepOld_whenSaveFails() throws IOException {
+        UUID id = UUID.randomUUID();
+        UUID categoryId = UUID.randomUUID();
+        Category category = Category.builder().id(categoryId).name("Marquesitas").displayOrder(1).build();
+        Product product = Product.builder().id(id).name("Marquesita").imageKey("products/old.png").build();
+        ProductRequest request = new ProductRequest("Marquesita", null, BigDecimal.TEN, categoryId, true);
+        MockMultipartFile image = new MockMultipartFile("image", "x.png", "image/png", PNG);
+        given(productRepository.findById(id)).willReturn(Optional.of(product));
+        given(categoryRepository.findById(categoryId)).willReturn(Optional.of(category));
+        givenImageStoredAs("products/new.png");
+        given(productRepository.save(product)).willThrow(new IllegalStateException("db down"));
+
+        assertThatThrownBy(() -> productService.update(id, request, image))
+                .isInstanceOf(IllegalStateException.class);
+        verify(imageStorage).delete("products/new.png");
+        verify(imageStorage, never()).delete("products/old.png");
+    }
 }

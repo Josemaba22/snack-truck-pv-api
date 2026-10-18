@@ -12,6 +12,10 @@ public interface ProductService {
 
     ProductResponse update(UUID id, ProductRequest request);
 
+    ProductResponse create(ProductRequest request, MultipartFile image);
+
+    ProductResponse update(UUID id, ProductRequest request, MultipartFile image);
+
     void delete(UUID id);
 
     ProductResponse getById(UUID id);
