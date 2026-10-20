@@ -25,6 +25,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -39,7 +40,7 @@ public class OrderServiceImpl implements OrderService {
             OrderStatus.PENDING, Set.of(OrderStatus.IN_PROGRESS, OrderStatus.READY, OrderStatus.CANCELLED),
             OrderStatus.IN_PROGRESS, Set.of(OrderStatus.PENDING, OrderStatus.READY, OrderStatus.CANCELLED),
             OrderStatus.READY, Set.of(OrderStatus.PENDING, OrderStatus.IN_PROGRESS, OrderStatus.COMPLETED, OrderStatus.CANCELLED),
-            OrderStatus.COMPLETED, Set.of(),
+            OrderStatus.COMPLETED, Set.of(OrderStatus.READY),
             OrderStatus.CANCELLED, Set.of());
 
     private final OrderRepository orderRepository;
@@ -51,6 +52,13 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderResponse create(OrderRequest request) {
+        if (request.clientOrderId() != null) {
+            Optional<Order> existing = orderRepository.findByClientOrderId(request.clientOrderId());
+            if (existing.isPresent()) {
+                return orderMapper.toResponse(existing.get());
+            }
+        }
+
         List<OrderDetail> details = new ArrayList<>();
         BigDecimal orderSubtotal = BigDecimal.ZERO;
 
@@ -67,6 +75,8 @@ public class OrderServiceImpl implements OrderService {
                 .notes(request.notes())
                 .customerName(request.customerName())
                 .paymentMethod(request.paymentMethod())
+                .clientOrderId(request.clientOrderId())
+                .createdAt(request.createdAt() != null ? request.createdAt() : LocalDateTime.now())
                 .orderDetails(details)
                 .build();
         details.forEach(detail -> detail.setOrder(order));
@@ -93,7 +103,7 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public OrderResponse updateStatus(UUID id, OrderStatusUpdateRequest request) {
         Order order = findOrder(id);
-        applyStatusTransition(order, request.status());
+        applyStatusTransition(order, request.status(), request.changedAt());
         return orderMapper.toResponse(orderRepository.save(order));
     }
 
@@ -101,7 +111,7 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public OrderResponse cancel(UUID id) {
         Order order = findOrder(id);
-        applyStatusTransition(order, OrderStatus.CANCELLED);
+        applyStatusTransition(order, OrderStatus.CANCELLED, null);
         return orderMapper.toResponse(orderRepository.save(order));
     }
 
@@ -168,7 +178,7 @@ public class OrderServiceImpl implements OrderService {
         return ingredient;
     }
 
-    private void applyStatusTransition(Order order, OrderStatus target) {
+    private void applyStatusTransition(Order order, OrderStatus target, LocalDateTime changedAt) {
         OrderStatus current = order.getStatus();
         Set<OrderStatus> allowed = ALLOWED_TRANSITIONS.getOrDefault(current, Set.of());
         if (!allowed.contains(target)) {
@@ -177,7 +187,9 @@ public class OrderServiceImpl implements OrderService {
         }
         order.setStatus(target);
         if (target == OrderStatus.COMPLETED) {
-            order.setCompletedAt(LocalDateTime.now());
+            order.setCompletedAt(changedAt != null ? changedAt : LocalDateTime.now());
+        } else if (current == OrderStatus.COMPLETED) {
+            order.setCompletedAt(null);
         }
     }
 

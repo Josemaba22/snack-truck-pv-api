@@ -26,7 +26,6 @@ import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.Generated;
 import org.hibernate.generator.EventType;
-import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 @Entity
@@ -71,7 +70,9 @@ public class Order {
     @Column(name = "payment_method", nullable = false, length = 20)
     private PaymentMethod paymentMethod;
 
-    @CreatedDate
+    @Column(name = "client_order_id", updatable = false, unique = true)
+    private UUID clientOrderId;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

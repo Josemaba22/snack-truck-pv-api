@@ -93,6 +93,8 @@ CREATE TABLE orders (
 
     customer_name VARCHAR(120),
 
+    client_order_id UUID UNIQUE,
+
     payment_method VARCHAR(20) NOT NULL,
 
     created_at TIMESTAMP WITHOUT TIME ZONE
