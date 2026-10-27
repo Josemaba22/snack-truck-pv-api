@@ -40,4 +40,7 @@ public class Ingredient {
     @Column(nullable = false)
     @Builder.Default
     private Boolean available = true;
+
+    @Column(name = "image_key", length = 255)
+    private String imageKey;
 }

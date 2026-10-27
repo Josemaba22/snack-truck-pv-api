@@ -7,5 +7,6 @@ public record IngredientResponse(
         UUID id,
         String name,
         BigDecimal price,
-        Boolean available) {
+        Boolean available,
+        String imageUrl) {
 }

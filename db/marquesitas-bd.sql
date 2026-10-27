@@ -42,7 +42,8 @@ CREATE TABLE ingredients (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(50) NOT NULL,
     price NUMERIC(10,2) NOT NULL CHECK (price >= 0),
-    available BOOLEAN NOT NULL DEFAULT TRUE
+    available BOOLEAN NOT NULL DEFAULT TRUE,
+    image_key VARCHAR(255)
 );
 
 -- ============================================
