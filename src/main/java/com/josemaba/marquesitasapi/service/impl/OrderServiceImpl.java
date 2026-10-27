@@ -72,7 +72,6 @@ public class OrderServiceImpl implements OrderService {
                 .status(OrderStatus.PENDING)
                 .subtotal(orderSubtotal)
                 .total(orderSubtotal)
-                .notes(request.notes())
                 .customerName(request.customerName())
                 .paymentMethod(request.paymentMethod())
                 .clientOrderId(request.clientOrderId())
@@ -156,6 +155,7 @@ public class OrderServiceImpl implements OrderService {
                 .product(product)
                 .quantity(item.quantity())
                 .unitPrice(product.getPrice())
+                .notes(item.notes())
                 .orderDetailIngredients(orderDetailIngredients)
                 .subtotal(lineSubtotal)
                 .build();

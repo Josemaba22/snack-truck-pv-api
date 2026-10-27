@@ -14,8 +14,6 @@ public record OrderRequest(
         @Valid
         List<OrderItemRequest> items,
 
-        String notes,
-
         String customerName,
 
         @NotNull(message = "paymentMethod is required")

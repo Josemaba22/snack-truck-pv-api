@@ -60,9 +60,6 @@ public class Order {
     @Builder.Default
     private BigDecimal total = BigDecimal.ZERO;
 
-    @Column(columnDefinition = "TEXT")
-    private String notes;
-
     @Column(name = "customer_name", length = 120)
     private String customerName;
 

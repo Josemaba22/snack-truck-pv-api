@@ -14,7 +14,6 @@ public record OrderResponse(
         OrderStatus status,
         BigDecimal subtotal,
         BigDecimal total,
-        String notes,
         String customerName,
         PaymentMethod paymentMethod,
         LocalDateTime createdAt,

@@ -16,5 +16,7 @@ public record OrderItemRequest(
 
         List<UUID> extraIngredientIds,
 
-        List<UUID> removedIngredientIds) {
+        List<UUID> removedIngredientIds,
+
+        String notes) {
 }

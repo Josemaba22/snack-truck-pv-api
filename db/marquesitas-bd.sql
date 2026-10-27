@@ -90,8 +90,6 @@ CREATE TABLE orders (
 
     total NUMERIC(10,2) NOT NULL DEFAULT 0,
 
-    notes TEXT,
-
     customer_name VARCHAR(120),
 
     client_order_id UUID UNIQUE,
@@ -121,6 +119,8 @@ CREATE TABLE order_details (
     unit_price NUMERIC(10,2) NOT NULL,
 
     subtotal NUMERIC(10,2) NOT NULL,
+
+    notes TEXT,
 
     CONSTRAINT fk_order_detail_order
         FOREIGN KEY(order_id)

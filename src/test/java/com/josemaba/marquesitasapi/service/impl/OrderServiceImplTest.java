@@ -72,8 +72,8 @@ class OrderServiceImplTest {
         Ingredient ingredient1 = Ingredient.builder().id(ingredient1Id).name("Queso extra").price(new BigDecimal("10.00")).available(true).build();
         Ingredient ingredient2 = Ingredient.builder().id(ingredient2Id).name("Tocino").price(new BigDecimal("8.00")).available(true).build();
 
-        OrderItemRequest item = new OrderItemRequest(productId, 2, List.of(ingredient1Id, ingredient2Id), null);
-        OrderRequest request = new OrderRequest(List.of(item), "sin cebolla", null, PaymentMethod.CASH, null, null);
+        OrderItemRequest item = new OrderItemRequest(productId, 2, List.of(ingredient1Id, ingredient2Id), null, "sin cebolla");
+        OrderRequest request = new OrderRequest(List.of(item), null, PaymentMethod.CASH, null, null);
 
         given(productRepository.findById(productId)).willReturn(Optional.of(product));
         given(ingredientRepository.findById(ingredient1Id)).willReturn(Optional.of(ingredient1));
@@ -96,6 +96,7 @@ class OrderServiceImplTest {
         assertThat(line.getUnitPrice()).isEqualByComparingTo("45.00");
         assertThat(line.getSubtotal()).isEqualByComparingTo("126.00");
         assertThat(line.getOrder()).isEqualTo(savedOrder);
+        assertThat(line.getNotes()).isEqualTo("sin cebolla");
         assertThat(line.getOrderDetailIngredients()).extracting(OrderDetailIngredient::getUnitPrice)
                 .containsExactlyInAnyOrder(new BigDecimal("10.00"), new BigDecimal("8.00"));
         assertThat(line.getOrderDetailIngredients()).allSatisfy(ingredient -> {
@@ -112,8 +113,8 @@ class OrderServiceImplTest {
         Product product = Product.builder().id(productId).name("Marquesita").price(new BigDecimal("45.00")).available(true).build();
         Ingredient ingredient = Ingredient.builder().id(ingredientId).name("Nutella").price(new BigDecimal("20.00")).available(true).build();
 
-        OrderItemRequest item = new OrderItemRequest(productId, 1, null, List.of(ingredientId));
-        OrderRequest request = new OrderRequest(List.of(item), null, null, PaymentMethod.CASH, null, null);
+        OrderItemRequest item = new OrderItemRequest(productId, 1, null, List.of(ingredientId), null);
+        OrderRequest request = new OrderRequest(List.of(item), null, PaymentMethod.CASH, null, null);
 
         given(productRepository.findById(productId)).willReturn(Optional.of(product));
         given(ingredientRepository.findById(ingredientId)).willReturn(Optional.of(ingredient));
@@ -136,8 +137,8 @@ class OrderServiceImplTest {
     @Test
     void create_shouldThrowResourceNotFoundException_whenProductDoesNotExist() {
         UUID productId = UUID.randomUUID();
-        OrderItemRequest item = new OrderItemRequest(productId, 1, null, null);
-        OrderRequest request = new OrderRequest(List.of(item), null, null, PaymentMethod.CASH, null, null);
+        OrderItemRequest item = new OrderItemRequest(productId, 1, null, null, null);
+        OrderRequest request = new OrderRequest(List.of(item), null, PaymentMethod.CASH, null, null);
         given(productRepository.findById(productId)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> orderService.create(request))
@@ -149,8 +150,8 @@ class OrderServiceImplTest {
     void create_shouldThrowBusinessRuleViolationException_whenProductNotAvailable() {
         UUID productId = UUID.randomUUID();
         Product product = Product.builder().id(productId).name("Marquesita").price(BigDecimal.TEN).available(false).build();
-        OrderItemRequest item = new OrderItemRequest(productId, 1, null, null);
-        OrderRequest request = new OrderRequest(List.of(item), null, null, PaymentMethod.CASH, null, null);
+        OrderItemRequest item = new OrderItemRequest(productId, 1, null, null, null);
+        OrderRequest request = new OrderRequest(List.of(item), null, PaymentMethod.CASH, null, null);
         given(productRepository.findById(productId)).willReturn(Optional.of(product));
 
         assertThatThrownBy(() -> orderService.create(request))
@@ -163,8 +164,8 @@ class OrderServiceImplTest {
         UUID productId = UUID.randomUUID();
         UUID ingredientId = UUID.randomUUID();
         Product product = Product.builder().id(productId).name("Marquesita").price(BigDecimal.TEN).available(true).build();
-        OrderItemRequest item = new OrderItemRequest(productId, 1, List.of(ingredientId), null);
-        OrderRequest request = new OrderRequest(List.of(item), null, null, PaymentMethod.CASH, null, null);
+        OrderItemRequest item = new OrderItemRequest(productId, 1, List.of(ingredientId), null, null);
+        OrderRequest request = new OrderRequest(List.of(item), null, PaymentMethod.CASH, null, null);
         given(productRepository.findById(productId)).willReturn(Optional.of(product));
         given(ingredientRepository.findById(ingredientId)).willReturn(Optional.empty());
 
@@ -178,8 +179,8 @@ class OrderServiceImplTest {
         UUID ingredientId = UUID.randomUUID();
         Product product = Product.builder().id(productId).name("Marquesita").price(BigDecimal.TEN).available(true).build();
         Ingredient ingredient = Ingredient.builder().id(ingredientId).name("Jalapenos").price(BigDecimal.ONE).available(false).build();
-        OrderItemRequest item = new OrderItemRequest(productId, 1, List.of(ingredientId), null);
-        OrderRequest request = new OrderRequest(List.of(item), null, null, PaymentMethod.CASH, null, null);
+        OrderItemRequest item = new OrderItemRequest(productId, 1, List.of(ingredientId), null, null);
+        OrderRequest request = new OrderRequest(List.of(item), null, PaymentMethod.CASH, null, null);
         given(productRepository.findById(productId)).willReturn(Optional.of(product));
         given(ingredientRepository.findById(ingredientId)).willReturn(Optional.of(ingredient));
 
@@ -193,8 +194,8 @@ class OrderServiceImplTest {
         UUID ingredientId = UUID.randomUUID();
         Product product = Product.builder().id(productId).name("Marquesita").price(BigDecimal.TEN).available(true).build();
         Ingredient ingredient = Ingredient.builder().id(ingredientId).name("Jalapenos").price(BigDecimal.ONE).available(true).build();
-        OrderItemRequest item = new OrderItemRequest(productId, 1, List.of(ingredientId), null);
-        OrderRequest request = new OrderRequest(List.of(item), null, null, PaymentMethod.CASH, null, null);
+        OrderItemRequest item = new OrderItemRequest(productId, 1, List.of(ingredientId), null, null);
+        OrderRequest request = new OrderRequest(List.of(item), null, PaymentMethod.CASH, null, null);
         given(productRepository.findById(productId)).willReturn(Optional.of(product));
         given(ingredientRepository.findById(ingredientId)).willReturn(Optional.of(ingredient));
         given(productRecipeDetailRepository.existsByProductIdAndIngredientIdAndIsBase(productId, ingredientId, false)).willReturn(false);
@@ -209,8 +210,8 @@ class OrderServiceImplTest {
         UUID ingredientId = UUID.randomUUID();
         Product product = Product.builder().id(productId).name("Marquesita").price(BigDecimal.TEN).available(true).build();
         Ingredient ingredient = Ingredient.builder().id(ingredientId).name("Nutella").price(BigDecimal.ONE).available(true).build();
-        OrderItemRequest item = new OrderItemRequest(productId, 1, null, List.of(ingredientId));
-        OrderRequest request = new OrderRequest(List.of(item), null, null, PaymentMethod.CASH, null, null);
+        OrderItemRequest item = new OrderItemRequest(productId, 1, null, List.of(ingredientId), null);
+        OrderRequest request = new OrderRequest(List.of(item), null, PaymentMethod.CASH, null, null);
         given(productRepository.findById(productId)).willReturn(Optional.of(product));
         given(ingredientRepository.findById(ingredientId)).willReturn(Optional.of(ingredient));
         given(productRecipeDetailRepository.existsByProductIdAndIngredientIdAndIsBase(productId, ingredientId, true)).willReturn(false);
@@ -248,8 +249,8 @@ class OrderServiceImplTest {
     void create_shouldReturnExistingOrder_whenClientOrderIdAlreadyExists() {
         UUID clientOrderId = UUID.randomUUID();
         Order existing = Order.builder().id(UUID.randomUUID()).clientOrderId(clientOrderId).status(OrderStatus.PENDING).build();
-        OrderItemRequest item = new OrderItemRequest(UUID.randomUUID(), 1, null, null);
-        OrderRequest request = new OrderRequest(List.of(item), null, null, PaymentMethod.CASH, clientOrderId, null);
+        OrderItemRequest item = new OrderItemRequest(UUID.randomUUID(), 1, null, null, null);
+        OrderRequest request = new OrderRequest(List.of(item), null, PaymentMethod.CASH, clientOrderId, null);
         given(orderRepository.findByClientOrderId(clientOrderId)).willReturn(Optional.of(existing));
 
         orderService.create(request);
@@ -264,8 +265,8 @@ class OrderServiceImplTest {
         UUID clientOrderId = UUID.randomUUID();
         LocalDateTime createdAt = LocalDateTime.of(2026, 10, 18, 14, 30);
         Product product = Product.builder().id(productId).name("Marquesita").price(new BigDecimal("45.00")).available(true).build();
-        OrderItemRequest item = new OrderItemRequest(productId, 1, null, null);
-        OrderRequest request = new OrderRequest(List.of(item), null, null, PaymentMethod.CASH, clientOrderId, createdAt);
+        OrderItemRequest item = new OrderItemRequest(productId, 1, null, null, null);
+        OrderRequest request = new OrderRequest(List.of(item), null, PaymentMethod.CASH, clientOrderId, createdAt);
         given(orderRepository.findByClientOrderId(clientOrderId)).willReturn(Optional.empty());
         given(productRepository.findById(productId)).willReturn(Optional.of(product));
         given(orderRepository.save(any(Order.class))).willAnswer(invocation -> invocation.getArgument(0));
